@@ -1,9 +1,6 @@
-// This package provides some punk-rock reflection which is not in the stdlib.
-package reflect
+package encoding
 
-import (
-	r "reflect"
-)
+import "reflect"
 
 // StructToMap converts a struct to map. The object's default key string
 // is the struct field name but can be specified in the struct field's
@@ -20,9 +17,9 @@ import (
 //   Field int "myName"
 func StructToMap(val interface{}) (map[string]interface{}, bool) {
 	// indirect so function works with both structs and pointers to them
-	structVal := r.Indirect(r.ValueOf(val))
+	structVal := reflect.Indirect(reflect.ValueOf(val))
 	kind := structVal.Kind()
-	if kind != r.Struct {
+	if kind != reflect.Struct {
 		return nil, false
 	}
 	structFields := cachedTypeFields(structVal.Type())
@@ -37,7 +34,7 @@ func StructToMap(val interface{}) (map[string]interface{}, bool) {
 // MapToStruct converts a map to a struct. It is the inverse of the StructToMap
 // function. For details see StructToMap.
 func MapToStruct(m map[string]interface{}, struc interface{}) error {
-	val := r.Indirect(r.ValueOf(struc))
+	val := reflect.Indirect(reflect.ValueOf(struc))
 	structFields := cachedTypeFields(val.Type())
 
 	// Create fields map for faster lookup
@@ -49,8 +46,8 @@ func MapToStruct(m map[string]interface{}, struc interface{}) error {
 	for k, v := range m {
 		if info, ok := fieldsMap[k]; ok {
 			structField := fieldByIndex(val, info.index)
-			if structField.Type().Name() == r.TypeOf(v).Name() {
-				structField.Set(r.ValueOf(v))
+			if structField.Type().Name() == reflect.TypeOf(v).Name() {
+				structField.Set(reflect.ValueOf(v))
 			}
 		}
 	}
@@ -62,9 +59,9 @@ func MapToStruct(m map[string]interface{}, struc interface{}) error {
 // see StructToMap.
 func FieldsAndValues(val interface{}) ([]string, []interface{}, bool) {
 	// indirect so function works with both structs and pointers to them
-	structVal := r.Indirect(r.ValueOf(val))
+	structVal := reflect.Indirect(reflect.ValueOf(val))
 	kind := structVal.Kind()
-	if kind != r.Struct {
+	if kind != reflect.Struct {
 		return nil, nil, false
 	}
 	structFields := cachedTypeFields(structVal.Type())
@@ -78,14 +75,14 @@ func FieldsAndValues(val interface{}) ([]string, []interface{}, bool) {
 	return fields, values, true
 }
 
-func fieldByIndex(v r.Value, index []int) r.Value {
+func fieldByIndex(v reflect.Value, index []int) reflect.Value {
 	for _, i := range index {
-		if v.Kind() == r.Ptr {
+		if v.Kind() == reflect.Ptr {
 			if v.IsNil() {
 				if v.CanSet() {
-					v.Set(r.New(v.Type().Elem()))
+					v.Set(reflect.New(v.Type().Elem()))
 				} else {
-					return r.Value{}
+					return reflect.Value{}
 				}
 			}
 			v = v.Elem()

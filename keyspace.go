@@ -2,178 +2,121 @@ package gocassa
 
 import (
 	"fmt"
+	"sort"
 	"strings"
-	"time"
 )
 
-type tableFactory interface {
-	NewTable(string, interface{}, map[string]interface{}, Keys) Table
+type KeyspaceOptions struct {
+	ReplicationClass  string
+	ReplicationFactor int
+	DataCenters       map[string]int
+	DurableWrites     bool
 }
 
-type k struct {
-	qe           QueryExecutor
-	name         string
-	debugMode    bool
-	tableFactory tableFactory
+type Keyspace struct {
+	qe      QueryExecutor
+	name    string
+	options KeyspaceOptions
 }
 
-// Connect to a certain keyspace directly. Same as using Connect().KeySpace(keySpaceName)
-func ConnectToKeySpace(keySpace string, nodeIps []string, username, password string) (KeySpace, error) {
-	c, err := Connect(nodeIps, username, password)
-	if err != nil {
-		return nil, err
+func NewKeyspace(qe QueryExecutor, name string, options *KeyspaceOptions) *Keyspace {
+	if options == nil {
+		options = &KeyspaceOptions{}
 	}
-	return c.KeySpace(keySpace), nil
-}
 
-func (k *k) DebugMode(b bool) {
-	k.debugMode = b
-}
-
-func (k *k) Table(name string, entity interface{}, keys Keys) Table {
-	n := name + "__" + strings.Join(keys.PartitionKeys, "_") + "__" + strings.Join(keys.ClusteringColumns, "_")
-	m, ok := toMap(entity)
-	if !ok {
-		panic("Unrecognized row type")
+	return &Keyspace{
+		qe:      qe,
+		name:    strings.ToLower(name),
+		options: *options,
 	}
-	return k.NewTable(n, entity, m, keys)
 }
 
-func (k *k) NewTable(name string, entity interface{}, fields map[string]interface{}, keys Keys) Table {
-	// Act both as a proxy to a tableFactory, and as the tableFactory itself (in most situations, a k will be its own
-	// tableFactory, but not always [ie. mocking])
-	if k.tableFactory != k {
-		return k.tableFactory.NewTable(name, entity, fields, keys)
-	} else {
-		ti := newTableInfo(k.name, name, keys, entity, fields)
-		return &t{
-			keySpace: k,
-			info:     ti,
-			options:  Options{},
+// Name returns the name of the current keyspace
+func (k *Keyspace) Name() string {
+	return k.name
+}
+
+// CreateStatement returns a CQL which will create the current keyspace if it
+// does not already exist.
+func (k *Keyspace) CreateStatement() string {
+	replicationMap := ""
+	if k.options.ReplicationClass == "SimpleStrategy" {
+		replicationMap = fmt.Sprintf("'class':'SimpleStrategy','replication_factor':%d", k.options.ReplicationFactor)
+	} else if k.options.ReplicationClass == "NetworkTopologyStrategy" {
+		dataCenters := make([]string, 0, len(k.options.DataCenters))
+		for dc, rf := range k.options.DataCenters {
+			dataCenters = append(dataCenters, fmt.Sprintf("'%s':%d", dc, rf))
 		}
+		// Sort to ensure generated CQL is always the same due to the fact that
+		// Go's maps are unordered
+		sort.Strings(dataCenters)
+
+		replicationMap = "'class':'NetworkTopologyStrategy'," + strings.Join(dataCenters, ",")
 	}
+
+	return fmt.Sprintf(
+		"CREATE KEYSPACE %s IF NOT EXISTS WITH REPLICATION = {%s} AND DURABLE_WRITES = %t;",
+		k.Name(), replicationMap, k.options.DurableWrites,
+	)
 }
 
-func (k *k) MapTable(name, id string, row interface{}) MapTable {
-	m, ok := toMap(row)
-	if !ok {
-		panic("Unrecognized row type")
-	}
-	return &mapT{
-		Table: k.NewTable(fmt.Sprintf("%s_map_%s", name, id), row, m, Keys{
-			PartitionKeys: []string{id},
-		}),
-		idField: id,
-	}
+// Create attempts to create the current keyspace if it does not already exist.
+func (k *Keyspace) Create() error {
+	return k.qe.Execute(RawQuery{
+		Statement: k.CreateStatement(),
+	}, nil)
 }
 
-func (k *k) SetKeysSpaceName(name string) {
-	k.name = name
+// DropStatement returns a CQL which will delete the current keyspace if it
+// exists
+func (k *Keyspace) DropStatement() string {
+	return fmt.Sprintf("DROP KEYSPACE IF EXISTS %s", k.Name())
 }
 
-func (k *k) MultimapTable(name, fieldToIndexBy, id string, row interface{}) MultimapTable {
-	m, ok := toMap(row)
-	if !ok {
-		panic("Unrecognized row type")
-	}
-	return &multimapT{
-		Table: k.NewTable(fmt.Sprintf("%s_multimap_%s_%s", name, fieldToIndexBy, id), row, m, Keys{
-			PartitionKeys:     []string{fieldToIndexBy},
-			ClusteringColumns: []string{id},
-		}),
-		idField:        id,
-		fieldToIndexBy: fieldToIndexBy,
-	}
-}
-
-func (k *k) MultimapMultiKeyTable(name string, fieldToIndexBy, id []string, row interface{}) MultimapMkTable {
-	m, ok := toMap(row)
-	if !ok {
-		panic("Unrecognized row type")
-	}
-	return &multimapMkT{
-		Table: k.NewTable(fmt.Sprintf("%s_multimapMk", name), row, m, Keys{
-			PartitionKeys:     fieldToIndexBy,
-			ClusteringColumns: id,
-		}),
-		idField:         id,
-		fieldsToIndexBy: fieldToIndexBy,
-	}
-}
-
-func (k *k) TimeSeriesTable(name, timeField, idField string, bucketSize time.Duration, row interface{}) TimeSeriesTable {
-	m, ok := toMap(row)
-	if !ok {
-		panic("Unrecognized row type")
-	}
-	m[bucketFieldName] = time.Now()
-	return &timeSeriesT{
-		Table: k.NewTable(fmt.Sprintf("%s_timeSeries_%s_%s_%s", name, timeField, idField, bucketSize), row, m, Keys{
-			PartitionKeys:     []string{bucketFieldName},
-			ClusteringColumns: []string{timeField, idField},
-		}),
-		timeField:  timeField,
-		idField:    idField,
-		bucketSize: bucketSize,
-	}
-}
-
-func (k *k) MultiTimeSeriesTable(name, indexField, timeField, idField string, bucketSize time.Duration, row interface{}) MultiTimeSeriesTable {
-	return k.FlexMultiTimeSeriesTable(name, timeField, idField, []string{indexField}, &tsBucketer{bucketSize: bucketSize}, row)
-}
-
-func (k *k) FlexMultiTimeSeriesTable(name, timeField, idField string, indexFields []string, bucketer Bucketer, row interface{}) MultiTimeSeriesTable {
-	m, ok := toMap(row)
-	if !ok {
-		panic("Unrecognized row type")
-	}
-	m[bucketFieldName] = time.Now()
-	pk := append([]string{}, indexFields...)
-	pk = append(pk, bucketFieldName)
-	return &multiTimeSeriesT{
-		Table: k.NewTable(fmt.Sprintf("%s_multiTimeSeries_%s_%s_%s_%s", name, strings.Join(indexFields, "_"), timeField, idField, bucketer.String()), row, m, Keys{
-			PartitionKeys:     pk,
-			ClusteringColumns: []string{timeField, idField},
-		}),
-		indexFields: indexFields,
-		timeField:   timeField,
-		idField:     idField,
-		bucketer:    bucketer,
-	}
+// Drop attempts to delete the current keyspace if it exists
+func (k *Keyspace) Drop() error {
+	return k.qe.Execute(RawQuery{
+		Statement: k.DropStatement(),
+	}, nil)
 }
 
 // Returns table names in a keyspace
-func (k *k) Tables() ([]string, error) {
-	const stmt = "SELECT columnfamily_name FROM system.schema_columnfamilies WHERE keyspace_name = ?"
-	maps, err := k.qe.Query(stmt, k.name)
+func (k *Keyspace) Tables() ([]string, error) {
+	stmt := fmt.Sprintf(
+		"SELECT columnfamily_name FROM system.schema_columnfamilies WHERE keyspace_name = %s",
+		k.Name(),
+	)
+
+	maps, err := k.qe.Query(RawQuery{
+		Statement: stmt,
+	}, nil)
 	if err != nil {
 		return nil, err
 	}
+
 	ret := []string{}
 	for _, m := range maps {
 		ret = append(ret, m["columnfamily_name"].(string))
 	}
+
 	return ret, nil
 }
 
-func (k *k) Exists(cf string) (bool, error) {
+func (k *Keyspace) TableExists(name string) (bool, error) {
 	ts, err := k.Tables()
 	if err != nil {
 		return false, err
 	}
+
 	for _, v := range ts {
-		if strings.ToLower(v) == strings.ToLower(cf) {
+		if strings.ToLower(v) == strings.ToLower(name) {
 			return true, nil
 		}
 	}
+
 	return false, nil
 }
 
-func (k *k) DropTable(cf string) error {
-	stmt := fmt.Sprintf("DROP TABLE IF EXISTS %s.%s", k.name, cf)
-	return k.qe.Execute(stmt)
-}
-
-func (k *k) Name() string {
-	return k.name
+func (k *Keyspace) QueryExecutor() QueryExecutor {
+	return k.qe
 }

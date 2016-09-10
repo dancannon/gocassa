@@ -1,4 +1,4 @@
-package reflect
+package encoding
 
 import (
 	"github.com/gocql/gocql"
