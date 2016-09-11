@@ -5,7 +5,7 @@ import "fmt"
 // A Selection is used with SELECT and DELETE statements and is used to build
 // selection , for example:
 //
-//     tbl.AddValue(MapTerm("field", "element")).Select()
+//     tbl.AddValue(MapTerm("field", "element")).List()
 //
 // will create the following CQL query:
 //

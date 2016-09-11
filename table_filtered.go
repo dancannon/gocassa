@@ -42,7 +42,7 @@ func (t *FilteredTable) Update(m map[string]interface{}) RunnableQuery {
 	}
 }
 
-func (t *FilteredTable) Select(fields ...Selection) RunnableQuery {
+func (t *FilteredTable) Read(fields ...Selection) RunnableQuery {
 	q := NewQuery(t.Table, SelectQueryType).Select(fields...)
 	for _, relation := range t.relations {
 		q = q.Where(relation)

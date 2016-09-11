@@ -56,14 +56,14 @@ func TestQueryUpdate_timestamp(t *testing.T) {
 
 	k := NewKeyspace(qe, "test", nil)
 	tbl := NewTable(k, "test", Document{}, []string{"fielda"}, nil, nil)
-	q := NewQuery(tbl, SelectQueryType).Select()
+	q := NewQuery(tbl, UpdateQueryType).Values(map[string]interface{}{"a": "a"})
 
 	stmt, values := q.GenerateStatement(QueryOptions{
 		Timestamp: time.Date(2016, 1, 1, 0, 0, 0, 0, time.UTC),
 	})
 
-	assert.Equal(t, `SELECT * FROM test.test USING TIMESTAMP 1451606400000`, stmt)
-	assert.Equal(t, []interface{}{}, values)
+	assert.Equal(t, `UPDATE test.test SET a = ? USING TIMESTAMP 1451606400000`, stmt)
+	assert.Equal(t, []interface{}{"a"}, values)
 }
 
 func TestQueryUpdate_ttl(t *testing.T) {
@@ -71,14 +71,14 @@ func TestQueryUpdate_ttl(t *testing.T) {
 
 	k := NewKeyspace(qe, "test", nil)
 	tbl := NewTable(k, "test", Document{}, []string{"fielda"}, nil, nil)
-	q := NewQuery(tbl, SelectQueryType).Select()
+	q := NewQuery(tbl, UpdateQueryType).Values(map[string]interface{}{"a": "a"})
 
 	stmt, values := q.GenerateStatement(QueryOptions{
-		TTL: 3600,
+		TTL: time.Hour,
 	})
 
-	assert.Equal(t, `SELECT * FROM test.test USING TTL 3600`, stmt)
-	assert.Equal(t, []interface{}{}, values)
+	assert.Equal(t, `UPDATE test.test SET a = ? USING TTL 3600`, stmt)
+	assert.Equal(t, []interface{}{"a"}, values)
 }
 
 func TestQueryUpdate_timestampAndTTL(t *testing.T) {
@@ -86,13 +86,13 @@ func TestQueryUpdate_timestampAndTTL(t *testing.T) {
 
 	k := NewKeyspace(qe, "test", nil)
 	tbl := NewTable(k, "test", Document{}, []string{"fielda"}, nil, nil)
-	q := NewQuery(tbl, SelectQueryType).Select()
+	q := NewQuery(tbl, UpdateQueryType).Values(map[string]interface{}{"a": "a"})
 
 	stmt, values := q.GenerateStatement(QueryOptions{
 		Timestamp: time.Date(2016, 1, 1, 0, 0, 0, 0, time.UTC),
-		TTL:       3600,
+		TTL:       time.Hour,
 	})
 
-	assert.Equal(t, `SELECT * FROM test.test USING TIMESTAMP 1451606400000 AND TTL 3600`, stmt)
-	assert.Equal(t, []interface{}{}, values)
+	assert.Equal(t, `UPDATE test.test SET a = ? USING TIMESTAMP 1451606400000 AND TTL 3600`, stmt)
+	assert.Equal(t, []interface{}{"a"}, values)
 }

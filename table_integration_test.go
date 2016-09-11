@@ -1,3 +1,5 @@
+// +build integration
+
 package gocassa
 
 import (
@@ -14,7 +16,7 @@ func TestIntegrationTableSinglePartitionKey(t *testing.T) {
 		FieldD string
 	}
 
-	tbl := NewTable(keyspace, "test", Document{}, []string{"fielda"}, nil, nil)
+	tbl := NewTable(keyspace, "table_single_partition", Document{}, []string{"fielda"}, nil, nil)
 
 	assert.Nil(t, tbl.Drop())
 	assert.Nil(t, tbl.Create())
@@ -42,9 +44,9 @@ func TestIntegrationTableSinglePartitionKey(t *testing.T) {
 		}).Execute())
 	})
 
-	t.Run("Select", func(t *testing.T) {
+	t.Run("Read", func(t *testing.T) {
 		doc := &Document{}
-		err := tbl.Where(Eq("fielda", "a")).Select().ScanOne(doc)
+		err := tbl.Where(Eq("fielda", "a")).Read().ScanOne(doc)
 		assert.Nil(t, err)
 
 		assert.Equal(t, "a", doc.FieldA)
@@ -55,7 +57,7 @@ func TestIntegrationTableSinglePartitionKey(t *testing.T) {
 
 	t.Run("List", func(t *testing.T) {
 		docs := []Document{}
-		err := tbl.Select().Scan(&docs)
+		err := tbl.List().Scan(&docs)
 
 		assert.Nil(t, err)
 		if assert.Len(t, docs, 2) {
@@ -69,7 +71,7 @@ func TestIntegrationTableSinglePartitionKey(t *testing.T) {
 		assert.Nil(t, err)
 
 		doc := &Document{}
-		err = tbl.Where(Eq("fielda", "a")).Select().ScanOne(doc)
+		err = tbl.Where(Eq("fielda", "a")).Read().ScanOne(doc)
 		assert.NotNil(t, err)
 	})
 
@@ -84,7 +86,7 @@ func TestIntegrationModifiers(t *testing.T) {
 		Map  map[string]int
 	}
 
-	tbl := NewTable(keyspace, "test", Document{}, []string{"ID"}, nil, nil)
+	tbl := NewTable(keyspace, "table_modifiers", Document{}, []string{"ID"}, nil, nil)
 
 	assert.Nil(t, tbl.Drop())
 	assert.Nil(t, tbl.Create())
@@ -104,7 +106,7 @@ func TestIntegrationModifiers(t *testing.T) {
 		assert.Nil(t, err)
 
 		doc := &Document{}
-		err = tbl.Where(Eq("id", "1")).Select().ScanOne(doc)
+		err = tbl.Where(Eq("id", "1")).Read().ScanOne(doc)
 		assert.Nil(t, err)
 		assert.NotContains(t, doc.Map, "b")
 	})
@@ -116,7 +118,7 @@ func TestIntegrationModifiers(t *testing.T) {
 		assert.Nil(t, err)
 
 		doc := &Document{}
-		err = tbl.Where(Eq("id", "1")).Select().ScanOne(doc)
+		err = tbl.Where(Eq("id", "1")).Read().ScanOne(doc)
 		assert.Nil(t, err)
 		assert.NotContains(t, doc.Map, "b")
 	})
@@ -128,7 +130,7 @@ func TestIntegrationModifiers(t *testing.T) {
 		assert.Nil(t, err)
 
 		doc := &Document{}
-		err = tbl.Where(Eq("id", "1")).Select().ScanOne(doc)
+		err = tbl.Where(Eq("id", "1")).Read().ScanOne(doc)
 		assert.Nil(t, err)
 		assert.Contains(t, doc.Map, "b")
 	})
@@ -140,7 +142,7 @@ func TestIntegrationModifiers(t *testing.T) {
 		assert.Nil(t, err)
 
 		doc := &Document{}
-		err = tbl.Where(Eq("id", "1")).Select().ScanOne(doc)
+		err = tbl.Where(Eq("id", "1")).Read().ScanOne(doc)
 		assert.Nil(t, err)
 		assert.Contains(t, doc.Map, "b")
 	})
@@ -151,7 +153,7 @@ func TestIntegrationMultiQuery(t *testing.T) {
 		ID string
 	}
 
-	tbl := NewTable(keyspace, "test", Document{}, []string{"ID"}, nil, nil)
+	tbl := NewTable(keyspace, "table_multi", Document{}, []string{"ID"}, nil, nil)
 
 	assert.Nil(t, tbl.Drop())
 	assert.Nil(t, tbl.Create())
@@ -167,7 +169,7 @@ func TestIntegrationMultiQuery(t *testing.T) {
 		err := q.Execute()
 		assert.Nil(t, err)
 
-		iter := tbl.Select().Iter()
+		iter := tbl.List().Iter()
 		assert.Nil(t, iter.Close())
 		assert.Equal(t, 2, iter.NumRows())
 	})
@@ -182,7 +184,7 @@ func TestIntegrationMultiQuery(t *testing.T) {
 		err := q.ExecuteBatch()
 		assert.Nil(t, err)
 
-		iter := tbl.Select().Iter()
+		iter := tbl.List().Iter()
 		assert.Nil(t, iter.Close())
 		assert.Equal(t, 4, iter.NumRows())
 	})

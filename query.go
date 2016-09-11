@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/dancannon/gocassa/encoding"
+	"github.com/davecgh/go-spew/spew"
 )
 
-// TODO: Add multi query/batch operations
 // TODO: Add IF conditions to DELETE/UPDATE
 // TODO: Add IF EXISTS to INSERT/UPDATE
 
@@ -285,18 +285,18 @@ func (q Query) addOptionsToStatement(buf *bytes.Buffer, options QueryOptions) []
 	timestamp := options.Timestamp.UnixNano() / 1000000
 	ttl := int64(options.TTL.Seconds())
 
+	spew.Dump(options.TTL)
+
 	if timestamp > 0 && ttl > 0 {
-		buf.WriteString("USING TIMESTAMP ")
+		buf.WriteString(" USING TIMESTAMP ")
 		buf.WriteString(strconv.FormatInt(timestamp, 10))
 		buf.WriteString(" AND TTL ")
 		buf.WriteString(strconv.FormatInt(ttl, 10))
-	}
-	if timestamp > 0 {
-		buf.WriteString("USING TIMESTAMP ")
+	} else if timestamp > 0 {
+		buf.WriteString(" USING TIMESTAMP ")
 		buf.WriteString(strconv.FormatInt(timestamp, 10))
-	}
-	if ttl > 0 {
-		buf.WriteString("USING TTL ")
+	} else if ttl > 0 {
+		buf.WriteString(" USING TTL ")
 		buf.WriteString(strconv.FormatInt(ttl, 10))
 	}
 

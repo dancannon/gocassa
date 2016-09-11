@@ -1,29 +1,35 @@
 package gocassa
 
-// type mapT struct {
-// 	Table
-// 	idField string
-// }
+type MapTable struct {
+	*Table
 
-// func (m *mapT) Update(id interface{}, ma map[string]interface{}) Op {
-// 	return m.Where(Eq(m.idField, id)).Update(ma)
-// }
+	partitionKey string
+}
 
-// func (m *mapT) Delete(id interface{}) Op {
-// 	return m.Where(Eq(m.idField, id)).Delete()
-// }
+func NewMapTable(keyspace *Keyspace, name string, documentValue interface{}, partitionKey string) *MapTable {
+	return &MapTable{
+		Table:        NewTable(keyspace, name, documentValue, []string{partitionKey}, nil, &TableOptions{}),
+		partitionKey: partitionKey,
+	}
+}
 
-// func (m *mapT) Read(id, pointer interface{}) Op {
-// 	return m.Where(Eq(m.idField, id)).ReadOne(pointer)
-// }
+func (t *MapTable) Update(id interface{}, m map[string]interface{}) RunnableQuery {
+	return t.Where(Eq(t.partitionKey, id)).Update(m)
+}
 
-// func (m *mapT) MultiRead(ids []interface{}, pointerToASlice interface{}) Op {
-// 	return m.Where(In(m.idField, ids...)).Read(pointerToASlice)
-// }
+func (t *MapTable) Delete(id interface{}) RunnableQuery {
+	return t.Where(Eq(t.partitionKey, id)).Delete()
+}
 
-// func (m *mapT) WithOptions(o Options) MapTable {
-// 	return &mapT{
-// 		Table:   m.Table.WithOptions(o),
-// 		idField: m.idField,
-// 	}
-// }
+func (t *MapTable) Read(id interface{}) RunnableQuery {
+	return t.Where(Eq(t.partitionKey, id)).Read()
+}
+
+func (t *MapTable) MultiRead(ids []interface{}) RunnableQuery {
+	return t.Where(In(t.partitionKey, ids...)).Read()
+}
+
+func (t *MapTable) WithOptions(options TableOptions) *MapTable {
+	t.Table = t.Table.WithOptions(options)
+	return t
+}

@@ -57,6 +57,11 @@ func (t *Table) Name() string {
 	return t.name
 }
 
+func (t *Table) WithOptions(options TableOptions) *Table {
+	t.options = options
+	return t
+}
+
 // CreateStatement returns a CQL which will create the current table if it
 // does not already exist.
 func (t *Table) CreateStatement() string {
@@ -151,7 +156,7 @@ func (t *Table) Set(v interface{}) RunnableQuery {
 	}
 }
 
-func (t *Table) Select() RunnableQuery {
+func (t *Table) List() RunnableQuery {
 	q := NewQuery(t, SelectQueryType)
 
 	return RunnableQuery{

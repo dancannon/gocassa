@@ -159,7 +159,7 @@ func TestTableSelect_order(t *testing.T) {
 	tbl := NewTable(k, "test", Document{}, []string{"fielda"}, nil, nil)
 
 	docs := []Document{}
-	err := tbl.Select().WithOptions(QueryOptions{
+	err := tbl.List().WithOptions(QueryOptions{
 		Orderings: []Ordering{
 			Ordering{"fielda", DESC},
 		},
@@ -183,7 +183,7 @@ func TestTableSelect_limit(t *testing.T) {
 	tbl := NewTable(k, "test", Document{}, []string{"fielda"}, nil, nil)
 
 	docs := []Document{}
-	err := tbl.Select().WithOptions(QueryOptions{
+	err := tbl.List().WithOptions(QueryOptions{
 		Limit: 10,
 	}).Scan(&docs)
 
