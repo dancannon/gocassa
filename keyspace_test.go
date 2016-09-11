@@ -11,7 +11,7 @@ func TestKeyspaceCreate_noOptions(t *testing.T) {
 	m := mock.Mock{}
 	m.On(
 		"Execute",
-		"CREATE KEYSPACE test IF NOT EXISTS WITH REPLICATION = {} AND DURABLE_WRITES = false;",
+		"CREATE KEYSPACE IF NOT EXISTS test WITH REPLICATION = {'class':'SimpleStrategy','replication_factor':1} AND DURABLE_WRITES = false;",
 		[]interface{}(nil),
 	).Return(nil)
 
@@ -26,7 +26,7 @@ func TestKeyspaceCreate_durableWrites(t *testing.T) {
 	m := mock.Mock{}
 	m.On(
 		"Execute",
-		"CREATE KEYSPACE test IF NOT EXISTS WITH REPLICATION = {} AND DURABLE_WRITES = true;",
+		"CREATE KEYSPACE IF NOT EXISTS test WITH REPLICATION = {'class':'SimpleStrategy','replication_factor':1} AND DURABLE_WRITES = true;",
 		[]interface{}(nil),
 	).Return(nil)
 
@@ -43,7 +43,7 @@ func TestKeyspaceCreate_simple(t *testing.T) {
 	m := mock.Mock{}
 	m.On(
 		"Execute",
-		"CREATE KEYSPACE test IF NOT EXISTS WITH REPLICATION = {'class':'SimpleStrategy','replication_factor':3} AND DURABLE_WRITES = false;",
+		"CREATE KEYSPACE IF NOT EXISTS test WITH REPLICATION = {'class':'SimpleStrategy','replication_factor':3} AND DURABLE_WRITES = false;",
 		[]interface{}(nil),
 	).Return(nil)
 
@@ -61,7 +61,7 @@ func TestKeyspaceCreate_networkSingleDC(t *testing.T) {
 	m := mock.Mock{}
 	m.On(
 		"Execute",
-		"CREATE KEYSPACE test IF NOT EXISTS WITH REPLICATION = {'class':'NetworkTopologyStrategy','dc1':3} AND DURABLE_WRITES = false;",
+		"CREATE KEYSPACE IF NOT EXISTS test WITH REPLICATION = {'class':'NetworkTopologyStrategy','dc1':3} AND DURABLE_WRITES = false;",
 		[]interface{}(nil),
 	).Return(nil)
 
@@ -81,7 +81,7 @@ func TestKeyspaceCreate_networkMultipleDC(t *testing.T) {
 	m := mock.Mock{}
 	m.On(
 		"Execute",
-		"CREATE KEYSPACE test IF NOT EXISTS WITH REPLICATION = {'class':'NetworkTopologyStrategy','dc1':3,'dc2':3} AND DURABLE_WRITES = false;",
+		"CREATE KEYSPACE IF NOT EXISTS test WITH REPLICATION = {'class':'NetworkTopologyStrategy','dc1':3,'dc2':3} AND DURABLE_WRITES = false;",
 		[]interface{}(nil),
 	).Return(nil)
 

@@ -15,12 +15,12 @@ import "reflect"
 //
 //   // Field appears in the resulting map as key "myName"
 //   Field int "myName"
-func StructToMap(val interface{}) (map[string]interface{}, bool) {
+func StructToMap(val interface{}) map[string]interface{} {
 	// indirect so function works with both structs and pointers to them
 	structVal := reflect.Indirect(reflect.ValueOf(val))
 	kind := structVal.Kind()
 	if kind != reflect.Struct {
-		return nil, false
+		return nil
 	}
 	structFields := cachedTypeFields(structVal.Type())
 	mapVal := make(map[string]interface{}, len(structFields))
@@ -28,7 +28,7 @@ func StructToMap(val interface{}) (map[string]interface{}, bool) {
 		field := fieldByIndex(structVal, info.index)
 		mapVal[info.name] = field.Interface()
 	}
-	return mapVal, true
+	return mapVal
 }
 
 // MapToStruct converts a map to a struct. It is the inverse of the StructToMap

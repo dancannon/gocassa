@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-type Document struct {
+type TypeDocument struct {
 	FieldA int        // int
 	FieldB int64      // bigint
 	FieldC uint       // varint
@@ -23,7 +23,7 @@ type Document struct {
 	FieldK Counter    // counter
 }
 
-type KeyDocument struct {
+type Document struct {
 	FieldA string
 	FieldB string
 	FieldC string
@@ -34,14 +34,14 @@ func TestTableCreate(t *testing.T) {
 	m := mock.Mock{}
 	m.On(
 		"Execute",
-		`CREATE TABLE IF NOT EXISTS test.test (fielda int,fieldb bigint,fieldc varint,fieldd varchar,fielde float,fieldf double,fieldg boolean,fieldh timestamp,fieldi uuid,fieldj blob,fieldk counter,PRIMARY KEY fielda)`,
+		`CREATE TABLE IF NOT EXISTS test.test (fielda int,fieldb bigint,fieldc varint,fieldd varchar,fielde float,fieldf double,fieldg boolean,fieldh timestamp,fieldi uuid,fieldj blob,fieldk counter,PRIMARY KEY (fielda))`,
 		[]interface{}(nil),
 	).Return(nil)
 
 	qe := NewMockExecutor(m)
 
 	k := NewKeyspace(qe, "test", nil)
-	tbl := NewTable(k, "test", Document{}, []string{"fielda"}, nil, nil)
+	tbl := NewTable(k, "test", TypeDocument{}, []string{"fielda"}, nil, nil)
 	assert.Nil(t, tbl.Create())
 	m.AssertExpectations(t)
 }
@@ -50,14 +50,14 @@ func TestTableCreate_partitionKey(t *testing.T) {
 	m := mock.Mock{}
 	m.On(
 		"Execute",
-		`CREATE TABLE IF NOT EXISTS test.test (fielda varchar,fieldb varchar,fieldc varchar,fieldd varchar,PRIMARY KEY fielda)`,
+		`CREATE TABLE IF NOT EXISTS test.test (fielda varchar,fieldb varchar,fieldc varchar,fieldd varchar,PRIMARY KEY (fielda))`,
 		[]interface{}(nil),
 	).Return(nil)
 
 	qe := NewMockExecutor(m)
 
 	k := NewKeyspace(qe, "test", nil)
-	tbl := NewTable(k, "test", KeyDocument{}, []string{"fielda"}, nil, nil)
+	tbl := NewTable(k, "test", Document{}, []string{"fielda"}, nil, nil)
 	assert.Nil(t, tbl.Create())
 	m.AssertExpectations(t)
 }
@@ -73,7 +73,7 @@ func TestTableCreate_PartitionClustering(t *testing.T) {
 	qe := NewMockExecutor(m)
 
 	k := NewKeyspace(qe, "test", nil)
-	tbl := NewTable(k, "test", KeyDocument{}, []string{"fielda"}, []string{"fieldb"}, nil)
+	tbl := NewTable(k, "test", Document{}, []string{"fielda"}, []string{"fieldb"}, nil)
 	assert.Nil(t, tbl.Create())
 	m.AssertExpectations(t)
 }
@@ -89,7 +89,7 @@ func TestTableCreate_multiplePartition(t *testing.T) {
 	qe := NewMockExecutor(m)
 
 	k := NewKeyspace(qe, "test", nil)
-	tbl := NewTable(k, "test", KeyDocument{}, []string{"fielda", "fieldb"}, nil, nil)
+	tbl := NewTable(k, "test", Document{}, []string{"fielda", "fieldb"}, nil, nil)
 	assert.Nil(t, tbl.Create())
 	m.AssertExpectations(t)
 }
@@ -105,7 +105,7 @@ func TestTableCreate_multipleClustering(t *testing.T) {
 	qe := NewMockExecutor(m)
 
 	k := NewKeyspace(qe, "test", nil)
-	tbl := NewTable(k, "test", KeyDocument{}, []string{"fielda"}, []string{"fieldb", "fieldc"}, nil)
+	tbl := NewTable(k, "test", Document{}, []string{"fielda"}, []string{"fieldb", "fieldc"}, nil)
 	assert.Nil(t, tbl.Create())
 	m.AssertExpectations(t)
 }
@@ -121,7 +121,7 @@ func TestTableCreate_multipleKeys(t *testing.T) {
 	qe := NewMockExecutor(m)
 
 	k := NewKeyspace(qe, "test", nil)
-	tbl := NewTable(k, "test", KeyDocument{}, []string{"fielda", "fieldb"}, []string{"fieldc", "fieldd"}, nil)
+	tbl := NewTable(k, "test", Document{}, []string{"fielda", "fieldb"}, []string{"fieldc", "fieldd"}, nil)
 	assert.Nil(t, tbl.Create())
 	m.AssertExpectations(t)
 }
@@ -130,14 +130,14 @@ func TestTableCreate_options(t *testing.T) {
 	m := mock.Mock{}
 	m.On(
 		"Execute",
-		`CREATE TABLE IF NOT EXISTS test.test (fielda varchar,fieldb varchar,fieldc varchar,fieldd varchar,PRIMARY KEY fielda) WITH COMPACT STORAGE AND CLUSTERING ORDER (fieldb DESC,fieldc ASC)`,
+		`CREATE TABLE IF NOT EXISTS test.test (fielda varchar,fieldb varchar,fieldc varchar,fieldd varchar,PRIMARY KEY (fielda)) WITH COMPACT STORAGE AND CLUSTERING ORDER (fieldb DESC,fieldc ASC)`,
 		[]interface{}(nil),
 	).Return(nil)
 
 	qe := NewMockExecutor(m)
 
 	k := NewKeyspace(qe, "test", nil)
-	tbl := NewTable(k, "test", KeyDocument{}, []string{"fielda"}, nil, &TableOptions{
+	tbl := NewTable(k, "test", Document{}, []string{"fielda"}, nil, &TableOptions{
 		ClusteringOrders: []ClusteringOrder{ClusteringOrder{"fieldb", DESC}, ClusteringOrder{"fieldc", ASC}},
 		CompactStorage:   true,
 	})

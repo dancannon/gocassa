@@ -40,6 +40,10 @@ func (k *Keyspace) Name() string {
 // does not already exist.
 func (k *Keyspace) CreateStatement() string {
 	replicationMap := ""
+	if k.options.ReplicationClass == "" {
+		k.options.ReplicationClass = "SimpleStrategy"
+		k.options.ReplicationFactor = 1
+	}
 	if k.options.ReplicationClass == "SimpleStrategy" {
 		replicationMap = fmt.Sprintf("'class':'SimpleStrategy','replication_factor':%d", k.options.ReplicationFactor)
 	} else if k.options.ReplicationClass == "NetworkTopologyStrategy" {
@@ -55,7 +59,7 @@ func (k *Keyspace) CreateStatement() string {
 	}
 
 	return fmt.Sprintf(
-		"CREATE KEYSPACE %s IF NOT EXISTS WITH REPLICATION = {%s} AND DURABLE_WRITES = %t;",
+		"CREATE KEYSPACE IF NOT EXISTS %s WITH REPLICATION = {%s} AND DURABLE_WRITES = %t;",
 		k.Name(), replicationMap, k.options.DurableWrites,
 	)
 }
@@ -64,7 +68,7 @@ func (k *Keyspace) CreateStatement() string {
 func (k *Keyspace) Create() error {
 	return k.qe.Execute(RawQuery{
 		Statement: k.CreateStatement(),
-	}, nil)
+	}, Options{})
 }
 
 // DropStatement returns a CQL which will delete the current keyspace if it
@@ -77,7 +81,7 @@ func (k *Keyspace) DropStatement() string {
 func (k *Keyspace) Drop() error {
 	return k.qe.Execute(RawQuery{
 		Statement: k.DropStatement(),
-	}, nil)
+	}, Options{})
 }
 
 // Returns table names in a keyspace
@@ -89,7 +93,7 @@ func (k *Keyspace) Tables() ([]string, error) {
 
 	maps, err := k.qe.Query(RawQuery{
 		Statement: stmt,
-	}, nil)
+	}, Options{})
 	if err != nil {
 		return nil, err
 	}

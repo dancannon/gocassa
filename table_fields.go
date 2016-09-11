@@ -36,7 +36,7 @@ func documentFields(v interface{}) []tableField {
 	case map[string]interface{}:
 		m = v
 	default:
-		m, _ = encoding.StructToMap(v)
+		m = encoding.StructToMap(v)
 	}
 
 	tableFields := make([]tableField, 0, len(m))

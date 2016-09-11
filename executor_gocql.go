@@ -1,6 +1,10 @@
 package gocassa
 
-import "github.com/gocql/gocql"
+import (
+	"github.com/Sirupsen/logrus"
+
+	"github.com/gocql/gocql"
+)
 
 // Connect uses the given gocql cluster configuration to connect to a Cassandra
 // cluster using the built-in GoCQL query executor. If you wish to use your
@@ -26,7 +30,7 @@ type gocqlExecutor struct {
 }
 
 // Query executes a query and returns the results.
-func (qe gocqlExecutor) Query(query QueryGenerator, opts *Options) ([]map[string]interface{}, error) {
+func (qe gocqlExecutor) Query(query QueryGenerator, opts Options) ([]map[string]interface{}, error) {
 	cqlQuery, err := qe.createCQLQuery(query, opts)
 	if err != nil {
 		return nil, err
@@ -46,7 +50,7 @@ func (qe gocqlExecutor) Query(query QueryGenerator, opts *Options) ([]map[string
 }
 
 // Query executes a query and returns the results.
-func (qe gocqlExecutor) Execute(query QueryGenerator, opts *Options) error {
+func (qe gocqlExecutor) Execute(query QueryGenerator, opts Options) error {
 	cqlQuery, err := qe.createCQLQuery(query, opts)
 	if err != nil {
 		return err
@@ -55,11 +59,15 @@ func (qe gocqlExecutor) Execute(query QueryGenerator, opts *Options) error {
 	return cqlQuery.Exec()
 }
 
-func (qe *gocqlExecutor) createCQLQuery(query QueryGenerator, opts *Options) (*gocql.Query, error) {
+func (qe *gocqlExecutor) createCQLQuery(query QueryGenerator, opts Options) (*gocql.Query, error) {
 	stmt, vals, err := query.GenerateStatement()
 	if err != nil {
 		return nil, err
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"values": vals,
+	}).Infof("Executing query: %s", stmt)
 
 	cqlQuery := qe.session.Query(stmt, vals...)
 	if opts.Consistency != nil {

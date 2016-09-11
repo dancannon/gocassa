@@ -17,7 +17,7 @@ type mockExecutor struct {
 }
 
 // Query executes a query and returns the results.
-func (qe mockExecutor) Query(query QueryGenerator, opts *Options) ([]map[string]interface{}, error) {
+func (qe mockExecutor) Query(query QueryGenerator, opts Options) ([]map[string]interface{}, error) {
 	stmt, vals, err := query.GenerateStatement()
 	if err != nil {
 		return nil, err
@@ -29,7 +29,7 @@ func (qe mockExecutor) Query(query QueryGenerator, opts *Options) ([]map[string]
 }
 
 // Query executes a query and returns the results.
-func (qe mockExecutor) Execute(query QueryGenerator, opts *Options) error {
+func (qe mockExecutor) Execute(query QueryGenerator, opts Options) error {
 	stmt, vals, err := query.GenerateStatement()
 	if err != nil {
 		return err
