@@ -4,7 +4,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/gocql/gocql"
 )
@@ -21,7 +20,7 @@ func TestMain(m *testing.M) {
 	cluster := gocql.NewCluster(cassandraHosts()...)
 	cluster.ProtoVersion = 3
 	cluster.Consistency = gocql.One
-	cluster.Timeout = 10 * time.Second // Travis' C* is sloooow
+	// cluster.Timeout = 10 * time.Second // Travis' C* is sloooow
 	cluster.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: 3}
 
 	qe, err := Connect(cluster)

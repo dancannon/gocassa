@@ -1,6 +1,10 @@
 package gocassa
 
-import "github.com/gocql/gocql"
+import (
+	"time"
+
+	"github.com/gocql/gocql"
+)
 
 type ColumnDirection bool
 
@@ -20,9 +24,9 @@ func (d ColumnDirection) String() string {
 	}
 }
 
-// ClusteringOrder specifies a clustering column and whether its
+// Ordering specifies a clustering column and whether its
 // clustering order is ASC or DESC.
-type ClusteringOrder struct {
+type Ordering struct {
 	Column    string
 	Direction ColumnDirection
 }
@@ -30,77 +34,40 @@ type ClusteringOrder struct {
 // // Options can contain table or statement specific options.
 // // The reason for this is because statement specific (TTL, Limit) options make sense as table level options
 // // (eg. have default TTL for every Update without specifying it all the time)
-type Options struct {
-	// 	// TTL specifies a duration over which data is valid. It will be truncated to second precision upon statement
-	// 	// execution.
-	// 	TTL time.Duration
-	// 	// Limit query result set
-	// 	Limit int
-	// 	// TableName overrides the default internal table name. When naming a table 'users' the internal table name becomes 'users_someTableSpecificMetaInformation'.
-	// 	TableName string
-	// 	// ClusteringOrder specifies the clustering order during table creation. If empty, it is omitted and the defaults are used.
-	// 	ClusteringOrders []ClusteringOrder
-	// 	// Indicates if allow filtering should be appended at the end of the query
-	// 	AllowFiltering bool
-	// 	// Select allows you to do partial reads, ie. retrieve only a subset of fields
-	// 	Select []string
+type QueryOptions struct {
+	// Timestamp specifies the time at which the column was written to the database,
+	// if not specified then the time that the write occurred to the column is used
+	Timestamp time.Time
+	// TTL specifies a duration over which data is valid. It will be truncated to second precision upon statement
+	// execution.
+	TTL time.Duration
+	// Limit query result set
+	Limit int
+	// ClusteringOrder specifies the clustering order during table creation. If empty, it is omitted and the defaults are used.
+	Orderings []Ordering
+	// Indicates if allow filtering should be appended at the end of the query
+	AllowFiltering bool
 	// Consistency specifies the consistency level. If nil, it is considered not set
 	Consistency *gocql.Consistency
-	// 	// Setting CompactStorage to true enables table creation with compact storage
-	// 	CompactStorage bool
-	// 	// Compressor specifies the compressor (if any) to use on a newly created table
-	// 	Compressor string
+	// SerialConsistency sets the consistency level for the
+	// serial phase of conditional updates. That consistency can only be
+	// either SERIAL or LOCAL_SERIAL and if not present, it defaults to
+	// SERIAL. This option will be ignored for anything else that a
+	// conditional update/insert.
+	SerialConsistency *gocql.SerialConsistency
+	// BatchType is used when executing a batch query
+	BatchType gocql.BatchType
 }
 
-// // Returns a new Options which is a right biased merge of the two initial Options.
-// func (o Options) Merge(neu Options) Options {
-// 	ret := Options{
-// 		TTL:             o.TTL,
-// 		Limit:           o.Limit,
-// 		TableName:       o.TableName,
-// 		ClusteringOrder: o.ClusteringOrder,
-// 		Select:          o.Select,
-// 		CompactStorage:  o.CompactStorage,
-// 		Compressor:      o.Compressor,
-// 	}
-// 	if neu.TTL != time.Duration(0) {
-// 		ret.TTL = neu.TTL
-// 	}
-// 	if neu.Limit != 0 {
-// 		ret.Limit = neu.Limit
-// 	}
-// 	if len(neu.TableName) > 0 {
-// 		ret.TableName = neu.TableName
-// 	}
-// 	if neu.ClusteringOrder != nil {
-// 		ret.ClusteringOrder = neu.ClusteringOrder
-// 	}
-// 	if neu.AllowFiltering {
-// 		ret.AllowFiltering = neu.AllowFiltering
-// 	}
-// 	if len(neu.Select) > 0 {
-// 		ret.Select = neu.Select
-// 	}
-// 	if neu.Consistency != nil {
-// 		ret.Consistency = neu.Consistency
-// 	}
-// 	if neu.CompactStorage {
-// 		ret.CompactStorage = neu.CompactStorage
-// 	}
-// 	if len(neu.Compressor) > 0 {
-// 		ret.Compressor = neu.Compressor
-// 	}
-// 	return ret
-// }
+type KeyspaceOptions struct {
+	ReplicationClass  string
+	ReplicationFactor int
+	DataCenters       map[string]int
+	DurableWrites     bool
+}
 
-// // AppendClusteringOrder adds a clustering order.  If there already clustering orders, the new one is added to the end.
-// func (o Options) AppendClusteringOrder(column string, direction ColumnDirection) Options {
-// 	col := ClusteringOrderColumn{
-// 		Column:    column,
-// 		Direction: direction,
-// 	}
-// 	co := append(o.ClusteringOrder, col)
-// 	withOrder := Options{ClusteringOrder: co}
-
-// 	return o.Merge(withOrder)
-// }
+type TableOptions struct {
+	CompactStorage bool
+	Orderings      []Ordering
+	Comment        string
+}

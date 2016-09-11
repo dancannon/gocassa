@@ -16,13 +16,9 @@ type Tweet struct {
 
 func TestStructToMap(t *testing.T) {
 	//Test that if the value is not a struct we return nil, false
-	m, ok := StructToMap("str")
+	m := StructToMap("str")
 	if m != nil {
 		t.Error("map is not nil when val is a string")
-	}
-	if ok {
-		t.Error("ok result from StructToMap when the val is a string")
-
 	}
 
 	tweet := Tweet{
@@ -33,10 +29,7 @@ func TestStructToMap(t *testing.T) {
 		nil,
 	}
 
-	m, ok = StructToMap(tweet)
-	if !ok {
-		t.Error("ok is false for a tweet")
-	}
+	m = StructToMap(tweet)
 
 	if m["Timeline"] != tweet.Timeline {
 		t.Errorf("Expected %s but got %s", tweet.Timeline, m["Timeline"])
@@ -57,7 +50,7 @@ func TestStructToMap(t *testing.T) {
 
 	id := gocql.TimeUUID()
 	tweet.OriginalTweet = &id
-	m, _ = StructToMap(tweet)
+	m = StructToMap(tweet)
 	if m["OriginalTweet"] != tweet.OriginalTweet {
 		t.Errorf("Expected nil but got %s", m["OriginalTweet"])
 	}

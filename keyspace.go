@@ -6,13 +6,6 @@ import (
 	"strings"
 )
 
-type KeyspaceOptions struct {
-	ReplicationClass  string
-	ReplicationFactor int
-	DataCenters       map[string]int
-	DurableWrites     bool
-}
-
 type Keyspace struct {
 	qe      QueryExecutor
 	name    string
@@ -68,7 +61,7 @@ func (k *Keyspace) CreateStatement() string {
 func (k *Keyspace) Create() error {
 	return k.qe.Execute(RawQuery{
 		Statement: k.CreateStatement(),
-	}, Options{})
+	}, QueryOptions{})
 }
 
 // DropStatement returns a CQL which will delete the current keyspace if it
@@ -81,7 +74,7 @@ func (k *Keyspace) DropStatement() string {
 func (k *Keyspace) Drop() error {
 	return k.qe.Execute(RawQuery{
 		Statement: k.DropStatement(),
-	}, Options{})
+	}, QueryOptions{})
 }
 
 // Returns table names in a keyspace
@@ -93,7 +86,7 @@ func (k *Keyspace) Tables() ([]string, error) {
 
 	maps, err := k.qe.Query(RawQuery{
 		Statement: stmt,
-	}, Options{})
+	}, QueryOptions{})
 	if err != nil {
 		return nil, err
 	}

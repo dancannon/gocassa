@@ -2,23 +2,27 @@ package gocassa
 
 import (
 	"bytes"
-	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/dancannon/gocassa/encoding"
 )
 
+// TODO: Add multi query/batch operations
+// TODO: Add IF conditions to DELETE/UPDATE
+// TODO: Add IF EXISTS to INSERT/UPDATE
+
 type QueryType uint8
 
 const (
-	ReadQueryType QueryType = iota
-	DeleteQueryType
-	UpdateQueryType
+	SelectQueryType QueryType = iota
 	InsertQueryType
+	UpdateQueryType
+	DeleteQueryType
 )
 
 type QueryGenerator interface {
-	GenerateStatement() (stmt string, values []interface{}, err error)
+	GenerateStatement(options QueryOptions) (stmt string, values []interface{})
 }
 
 type RawQuery struct {
@@ -26,15 +30,18 @@ type RawQuery struct {
 	Values    []interface{}
 }
 
-func (q RawQuery) GenerateStatement() (stmt string, values []interface{}, err error) {
-	return q.Statement, q.Values, nil
+func (q RawQuery) GenerateStatement(options QueryOptions) (stmt string, values []interface{}) {
+	return q.Statement, q.Values
 }
 
 type Query struct {
-	table           *Table
-	queryType       QueryType
-	rowSpecificaton []Relation
-	values          map[string]interface{}
+	table      *Table
+	queryType  QueryType
+	relations  []Relation
+	selections []Selection
+	orderings  []Ordering
+	limit      int
+	values     map[string]interface{}
 }
 
 func NewQuery(table *Table, queryType QueryType) Query {
@@ -44,54 +51,270 @@ func NewQuery(table *Table, queryType QueryType) Query {
 	}
 }
 
-func (q Query) Where(filter Relation) Query {
-	q.rowSpecificaton = append(q.rowSpecificaton, filter)
+func (q Query) Where(relations ...Relation) Query {
+	q.relations = append(q.relations, relations...)
 
 	return q
 }
 
-func (q Query) SetValues(m map[string]interface{}) Query {
+func (q Query) Select(selections ...Selection) Query {
+	q.selections = append(q.selections, selections...)
+	return q
+}
+
+func (q Query) OrderBy(orderings ...Ordering) Query {
+	q.orderings = append(q.orderings, orderings...)
+	return q
+}
+
+func (q Query) Limit(limit int) Query {
+	q.limit = limit
+	return q
+}
+
+func (q Query) Values(m map[string]interface{}) Query {
 	q.values = m
 	return q
 }
 
-func (q Query) GenerateStatement() (stmt string, values []interface{}, err error) {
+func (q Query) GenerateStatement(options QueryOptions) (stmt string, values []interface{}) {
 	switch q.queryType {
+	case SelectQueryType:
+		return q.generateSelectStatement(options)
+	case InsertQueryType:
+		return q.generateInsertStatement(options)
 	case UpdateQueryType:
-		buf := new(bytes.Buffer)
-		buf.WriteString(fmt.Sprintf("UPDATE %s.%s ", q.table.keyspace.Name(), q.table.Name()))
+		return q.generateUpdateStatement(options)
+	case DeleteQueryType:
+		return q.generateDeleteStatement(options)
+	default:
+		return "", nil
+	}
+}
 
-		buf.WriteString("SET ")
-		i := 0
-		for k, v := range q.values {
-			if i > 0 {
-				buf.WriteString(", ")
-			}
+func (q Query) generateSelectStatement(options QueryOptions) (string, []interface{}) {
+
+	buf := new(bytes.Buffer)
+	values := []interface{}{}
+
+	buf.WriteString("SELECT ")
+	if len(q.selections) > 0 {
+		values = append(values, q.addSelectionsToStatement(buf)...)
+	} else {
+		buf.WriteString("*")
+	}
+	buf.WriteString(" FROM ")
+	buf.WriteString(q.table.keyspace.Name())
+	buf.WriteString(".")
+	buf.WriteString(q.table.Name())
+	values = append(values, q.addWhereToStatement(buf)...)
+	values = append(values, q.addOrderByToStatement(buf, options)...)
+	values = append(values, q.addLimitToStatement(buf, options)...)
+	if options.AllowFiltering {
+		buf.WriteString(" ALLOW FILTERING")
+	}
+
+	return buf.String(), values
+}
+
+func (q Query) generateInsertStatement(options QueryOptions) (string, []interface{}) {
+	buf := new(bytes.Buffer)
+	values := []interface{}{}
+
+	buf.WriteString("INSERT INTO ")
+	buf.WriteString(q.table.keyspace.Name())
+	buf.WriteString(".")
+	buf.WriteString(q.table.Name())
+	buf.WriteString(" (")
+	values = append(values, q.addValueNamesToStatement(buf)...)
+	buf.WriteString(") VALUES (")
+	values = append(values, q.addValuesToStatement(buf)...)
+	buf.WriteString(")")
+	values = append(values, q.addOptionsToStatement(buf, options)...)
+
+	return buf.String(), values
+}
+
+func (q Query) generateUpdateStatement(options QueryOptions) (string, []interface{}) {
+	buf := new(bytes.Buffer)
+	values := []interface{}{}
+
+	buf.WriteString("UPDATE ")
+	buf.WriteString(q.table.keyspace.Name())
+	buf.WriteString(".")
+	buf.WriteString(q.table.Name())
+	buf.WriteString(" SET ")
+	values = append(values, q.addAssignmentsToStatement(buf)...)
+	values = append(values, q.addWhereToStatement(buf)...)
+	values = append(values, q.addOptionsToStatement(buf, options)...)
+
+	return buf.String(), values
+}
+
+func (q Query) generateDeleteStatement(options QueryOptions) (string, []interface{}) {
+	buf := new(bytes.Buffer)
+	values := []interface{}{}
+
+	buf.WriteString("DELETE ")
+	if len(q.selections) > 0 {
+		values = append(values, q.addSelectionsToStatement(buf)...)
+		buf.WriteString(" ")
+	}
+	buf.WriteString("FROM ")
+	buf.WriteString(q.table.keyspace.Name())
+	buf.WriteString(".")
+	buf.WriteString(q.table.Name())
+	values = append(values, q.addWhereToStatement(buf)...)
+
+	return buf.String(), values
+}
+
+func (q Query) addSelectionsToStatement(buf *bytes.Buffer) []interface{} {
+	for i, f := range q.selections {
+		if i > 0 {
+			buf.WriteString(",")
+		}
+
+		buf.WriteString(f.generateCQL())
+	}
+
+	return nil
+}
+
+func (q Query) addValueNamesToStatement(buf *bytes.Buffer) []interface{} {
+	values := []interface{}{}
+
+	// TODO: Sort values if required (for testing)
+
+	i := 0
+	for k, v := range q.values {
+		if i > 0 {
+			buf.WriteString(",")
+		}
+
+		buf.WriteString(k)
+		values = append(values, v)
+		i++
+	}
+
+	return values
+}
+
+func (q Query) addValuesToStatement(buf *bytes.Buffer) []interface{} {
+	i := 0
+	for range q.values {
+		if i > 0 {
+			buf.WriteString(",")
+		}
+		buf.WriteString("?")
+		i++
+	}
+
+	return nil
+}
+
+func (q Query) addAssignmentsToStatement(buf *bytes.Buffer) []interface{} {
+	values := []interface{}{}
+
+	i := 0
+	for k, v := range q.values {
+		if i > 0 {
+			buf.WriteString(",")
+		}
+
+		if mod, ok := v.(Modifier); ok {
+			stmt, vals := mod.generateCQL(k)
+			buf.WriteString(stmt)
+			values = append(values, vals...)
+		} else {
 			buf.WriteString(k + " = ?")
 			values = append(values, v)
-			i++
 		}
+		i++
+	}
 
-		if len(q.rowSpecificaton) > 0 {
-			buf.WriteString(" WHERE ")
-			for i, r := range q.rowSpecificaton {
-				if i > 0 {
-					buf.WriteString(" AND ")
-				}
-				s, v := r.cql()
-				buf.WriteString(s)
-				if r.op == in {
-					values = append(values, v)
-					continue
-				}
-				values = append(values, v...)
+	return values
+}
+
+func (q Query) addWhereToStatement(buf *bytes.Buffer) []interface{} {
+	values := []interface{}{}
+
+	if len(q.relations) > 0 {
+		buf.WriteString(" WHERE ")
+		for i, r := range q.relations {
+			if i > 0 {
+				buf.WriteString(" AND ")
+			}
+			cql, vals := r.generateCQL()
+			buf.WriteString(cql)
+			if r.relationType == relationTypeIN {
+				values = append(values, vals)
+			} else {
+				values = append(values, vals...)
 			}
 		}
-
-		return buf.String(), values, nil
-	default:
-		return "", nil, fmt.Errorf("Unsupported query type %v", q.queryType)
 	}
+
+	return values
+}
+
+func (q Query) addOrderByToStatement(buf *bytes.Buffer, options QueryOptions) []interface{} {
+	values := []interface{}{}
+
+	if len(options.Orderings) > 0 {
+		q.orderings = options.Orderings
+	}
+
+	if len(q.orderings) > 0 {
+		buf.WriteString(" ORDER BY ")
+		for i, ordering := range q.orderings {
+			if i > 0 {
+				buf.WriteString(",")
+			}
+
+			buf.WriteString(ordering.Column)
+			buf.WriteString(" ")
+			buf.WriteString(ordering.Direction.String())
+		}
+	}
+
+	return values
+}
+
+func (q Query) addOptionsToStatement(buf *bytes.Buffer, options QueryOptions) []interface{} {
+	timestamp := options.Timestamp.UnixNano() / 1000000
+	ttl := int64(options.TTL.Seconds())
+
+	if timestamp > 0 && ttl > 0 {
+		buf.WriteString("USING TIMESTAMP ")
+		buf.WriteString(strconv.FormatInt(timestamp, 10))
+		buf.WriteString(" AND TTL ")
+		buf.WriteString(strconv.FormatInt(ttl, 10))
+	}
+	if timestamp > 0 {
+		buf.WriteString("USING TIMESTAMP ")
+		buf.WriteString(strconv.FormatInt(timestamp, 10))
+	}
+	if ttl > 0 {
+		buf.WriteString("USING TTL ")
+		buf.WriteString(strconv.FormatInt(ttl, 10))
+	}
+
+	return nil
+}
+
+func (q Query) addLimitToStatement(buf *bytes.Buffer, options QueryOptions) []interface{} {
+	if options.Limit > 0 {
+		q.limit = options.Limit
+	}
+
+	if q.limit > 0 {
+		buf.WriteString(" LIMIT ?")
+
+		return []interface{}{q.limit}
+	}
+
+	return nil
 }
 
 func toMap(v interface{}) map[string]interface{} {

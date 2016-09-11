@@ -4,15 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-
-	"github.com/davecgh/go-spew/spew"
 )
-
-type TableOptions struct {
-	CompactStorage   bool
-	ClusteringOrders []ClusteringOrder
-	Comment          string
-}
 
 // The Table type is the lowest level type included in the package and allows any
 // type of table to be created using any combination of partition and clustering
@@ -94,13 +86,13 @@ func (t *Table) CreateStatement() string {
 	if t.options.CompactStorage {
 		properties = append(properties, "COMPACT STORAGE")
 	}
-	if len(t.options.ClusteringOrders) > 0 {
-		orders := []string{}
-		for _, order := range t.options.ClusteringOrders {
-			orders = append(orders, fmt.Sprintf("%s %s", order.Column, order.Direction))
+	if len(t.options.Orderings) > 0 {
+		orderings := []string{}
+		for _, ordering := range t.options.Orderings {
+			orderings = append(orderings, fmt.Sprintf("%s %s", ordering.Column, ordering.Direction))
 		}
-		sort.Strings(orders)
-		properties = append(properties, fmt.Sprintf("CLUSTERING ORDER (%s)", strings.Join(orders, ",")))
+		sort.Strings(orderings)
+		properties = append(properties, fmt.Sprintf("CLUSTERING ORDER (%s)", strings.Join(orderings, ",")))
 	}
 	if t.options.Comment != "" {
 		properties = append(properties, fmt.Sprintf("comment = '%v'", t.options.Comment))
@@ -123,7 +115,7 @@ func (t *Table) CreateStatement() string {
 func (t *Table) Create() error {
 	return t.keyspace.QueryExecutor().Execute(RawQuery{
 		Statement: t.CreateStatement(),
-	}, Options{})
+	}, QueryOptions{})
 }
 
 // DropStatement returns a CQL which will delete the current table if it
@@ -136,24 +128,52 @@ func (t *Table) DropStatement() string {
 func (t *Table) Drop() error {
 	return t.keyspace.QueryExecutor().Execute(RawQuery{
 		Statement: t.DropStatement(),
-	}, Options{})
+	}, QueryOptions{})
 }
 
-func (t *Table) Set(v interface{}) error {
+func (t *Table) Set(v interface{}) RunnableQuery {
 	fields := transformFields(toMap(v))
 	updateFields := removeFields(fields, append(t.partitionKeys, t.clusteringColumns...))
 
 	var q Query
 	if len(updateFields) == 0 {
-		q = NewQuery(t, InsertQueryType).SetValues(fields)
+		q = NewQuery(t, InsertQueryType).Values(fields)
 	} else {
-		q = NewQuery(t, UpdateQueryType).SetValues(updateFields)
-		spew.Dump(fields)
+		q = NewQuery(t, UpdateQueryType).Values(updateFields)
 		for _, k := range append(t.partitionKeys, t.clusteringColumns...) {
-			spew.Dump(k)
 			q = q.Where(Eq(k, fields[k]))
 		}
 	}
 
-	return t.keyspace.QueryExecutor().Execute(q, Options{})
+	return RunnableQuery{
+		Executor: t.keyspace.QueryExecutor(),
+		Query:    q,
+	}
+}
+
+func (t *Table) Select() RunnableQuery {
+	q := NewQuery(t, SelectQueryType)
+
+	return RunnableQuery{
+		Executor: t.keyspace.QueryExecutor(),
+		Query:    q,
+	}
+}
+
+func (t *Table) Insert(m map[string]interface{}) RunnableQuery {
+	fields := transformFields(m)
+
+	q := NewQuery(t, InsertQueryType).Values(fields)
+
+	return RunnableQuery{
+		Executor: t.keyspace.QueryExecutor(),
+		Query:    q,
+	}
+}
+
+func (t *Table) Where(relations ...Relation) *FilteredTable {
+	return &FilteredTable{
+		Table:     t,
+		relations: relations,
+	}
 }

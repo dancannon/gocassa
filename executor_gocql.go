@@ -1,6 +1,8 @@
 package gocassa
 
 import (
+	"sync"
+
 	"github.com/Sirupsen/logrus"
 
 	"github.com/gocql/gocql"
@@ -29,12 +31,31 @@ type gocqlExecutor struct {
 	session *gocql.Session
 }
 
-// Query executes a query and returns the results.
-func (qe gocqlExecutor) Query(query QueryGenerator, opts Options) ([]map[string]interface{}, error) {
-	cqlQuery, err := qe.createCQLQuery(query, opts)
-	if err != nil {
+func (qe gocqlExecutor) QueryOne(query QueryGenerator, options QueryOptions) (map[string]interface{}, error) {
+	cqlQuery := qe.createCQLQuery(query, options)
+
+	m := map[string]interface{}{}
+	if err := cqlQuery.MapScan(m); err != nil {
 		return nil, err
 	}
+
+	return m, nil
+}
+
+func (qe gocqlExecutor) QueryCAS(query QueryGenerator, options QueryOptions) (result map[string]interface{}, applied bool, err error) {
+	cqlQuery := qe.createCQLQuery(query, options)
+
+	m := map[string]interface{}{}
+	applied, err = cqlQuery.MapScanCAS(m)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return m, applied, nil
+}
+
+func (qe gocqlExecutor) Query(query QueryGenerator, options QueryOptions) ([]map[string]interface{}, error) {
+	cqlQuery := qe.createCQLQuery(query, options)
 
 	iter := cqlQuery.Iter()
 	ret := []map[string]interface{}{}
@@ -49,35 +70,126 @@ func (qe gocqlExecutor) Query(query QueryGenerator, opts Options) ([]map[string]
 	return ret, iter.Close()
 }
 
-// Query executes a query and returns the results.
-func (qe gocqlExecutor) Execute(query QueryGenerator, opts Options) error {
-	cqlQuery, err := qe.createCQLQuery(query, opts)
-	if err != nil {
-		return err
+func (qe gocqlExecutor) Iter(query QueryGenerator, options QueryOptions) Iter {
+	cqlQuery := qe.createCQLQuery(query, options)
+
+	return gocqlIter{
+		iter: cqlQuery.Iter(),
 	}
+}
+
+// Query executes a query and returns the results.
+func (qe gocqlExecutor) Execute(query QueryGenerator, options QueryOptions) error {
+	cqlQuery := qe.createCQLQuery(query, options)
 
 	return cqlQuery.Exec()
 }
 
-func (qe *gocqlExecutor) createCQLQuery(query QueryGenerator, opts Options) (*gocql.Query, error) {
-	stmt, vals, err := query.GenerateStatement()
-	if err != nil {
-		return nil, err
-	}
+func (qe gocqlExecutor) ExecuteBatch(queries []QueryGenerator, options QueryOptions) error {
+	batch := qe.createCQLBatch(queries, options)
+
+	return qe.session.ExecuteBatch(batch)
+}
+
+func (qe gocqlExecutor) ExecuteBatchCAS(
+	queries []QueryGenerator, options QueryOptions,
+) (
+	result map[string]interface{}, iter Iter, applied bool, err error,
+) {
+	batch := qe.createCQLBatch(queries, options)
+
+	applied, cqlIter, err := qe.session.MapExecuteBatchCAS(batch, result)
+
+	return result, gocqlIter{
+		iter: cqlIter,
+		err:  err,
+	}, applied, err
+}
+
+func (qe gocqlExecutor) Close() {
+	qe.session.Close()
+}
+
+func (qe *gocqlExecutor) createCQLQuery(query QueryGenerator, options QueryOptions) *gocql.Query {
+	stmt, vals := query.GenerateStatement(options)
 
 	logrus.WithFields(logrus.Fields{
 		"values": vals,
 	}).Infof("Executing query: %s", stmt)
 
 	cqlQuery := qe.session.Query(stmt, vals...)
-	if opts.Consistency != nil {
-		cqlQuery = cqlQuery.Consistency(*opts.Consistency)
+	if options.Consistency != nil {
+		cqlQuery = cqlQuery.Consistency(*options.Consistency)
 	}
 
-	return cqlQuery, nil
+	return cqlQuery
 }
 
-// Close closes the underlying session
-func (qe gocqlExecutor) Close() {
-	qe.session.Close()
+func (qe *gocqlExecutor) createCQLBatch(queries []QueryGenerator, options QueryOptions) *gocql.Batch {
+	batch := gocql.NewBatch(options.BatchType)
+	if options.Consistency != nil {
+		batch.Cons = *options.Consistency
+	}
+	if options.SerialConsistency != nil {
+		batch = batch.SerialConsistency(*options.SerialConsistency)
+	}
+
+	for _, query := range queries {
+		stmt, vals := query.GenerateStatement(options)
+
+		logrus.WithFields(logrus.Fields{
+			"values": vals,
+		}).Infof("Adding query to batch: %s", stmt)
+
+		batch.Query(stmt, vals...)
+	}
+
+	return batch
+}
+
+type gocqlIter struct {
+	mtx  sync.Mutex
+	iter *gocql.Iter
+	err  error
+}
+
+func (iter gocqlIter) Scan(dest interface{}) bool {
+	var m map[string]interface{}
+
+	if ok := iter.iter.MapScan(m); !ok {
+		return false
+	}
+
+	if err := decodeResult(m, dest); err != nil {
+		iter.mtx.Lock()
+		iter.err = err
+		iter.mtx.Unlock()
+
+		return false
+	}
+
+	return true
+}
+
+func (iter gocqlIter) NumRows() int {
+	return iter.iter.NumRows()
+}
+
+func (iter gocqlIter) WillSwitchPage() bool {
+	return iter.iter.WillSwitchPage()
+}
+
+func (iter gocqlIter) GetCustomPayload() map[string][]byte {
+	return iter.iter.GetCustomPayload()
+}
+
+func (iter gocqlIter) Close() error {
+	if err := iter.iter.Close(); err != nil {
+		return err
+	}
+
+	iter.mtx.Lock()
+	defer iter.mtx.Unlock()
+
+	return iter.err
 }

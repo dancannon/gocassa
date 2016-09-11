@@ -138,9 +138,55 @@ func TestTableCreate_options(t *testing.T) {
 
 	k := NewKeyspace(qe, "test", nil)
 	tbl := NewTable(k, "test", Document{}, []string{"fielda"}, nil, &TableOptions{
-		ClusteringOrders: []ClusteringOrder{ClusteringOrder{"fieldb", DESC}, ClusteringOrder{"fieldc", ASC}},
-		CompactStorage:   true,
+		Orderings:      []Ordering{Ordering{"fieldb", DESC}, Ordering{"fieldc", ASC}},
+		CompactStorage: true,
 	})
 	assert.Nil(t, tbl.Create())
+	m.AssertExpectations(t)
+}
+
+func TestTableSelect_order(t *testing.T) {
+	m := mock.Mock{}
+	m.On(
+		"Query",
+		`SELECT * FROM test.test ORDER BY fielda DESC`,
+		[]interface{}{},
+	).Return([]map[string]interface{}{}, nil)
+
+	qe := NewMockExecutor(m)
+
+	k := NewKeyspace(qe, "test", nil)
+	tbl := NewTable(k, "test", Document{}, []string{"fielda"}, nil, nil)
+
+	docs := []Document{}
+	err := tbl.Select().WithOptions(QueryOptions{
+		Orderings: []Ordering{
+			Ordering{"fielda", DESC},
+		},
+	}).Scan(&docs)
+
+	assert.Nil(t, err)
+	m.AssertExpectations(t)
+}
+
+func TestTableSelect_limit(t *testing.T) {
+	m := mock.Mock{}
+	m.On(
+		"Query",
+		`SELECT * FROM test.test LIMIT ?`,
+		[]interface{}{10},
+	).Return([]map[string]interface{}{}, nil)
+
+	qe := NewMockExecutor(m)
+
+	k := NewKeyspace(qe, "test", nil)
+	tbl := NewTable(k, "test", Document{}, []string{"fielda"}, nil, nil)
+
+	docs := []Document{}
+	err := tbl.Select().WithOptions(QueryOptions{
+		Limit: 10,
+	}).Scan(&docs)
+
+	assert.Nil(t, err)
 	m.AssertExpectations(t)
 }
