@@ -100,9 +100,7 @@ func TestIntegrationModifiers(t *testing.T) {
 	})
 
 	t.Run("DeleteMapKey", func(t *testing.T) {
-		err := tbl.Where(Eq("ID", "1")).Delete(
-			MapKey("map", "b"),
-		).Execute()
+		err := tbl.Fields(MapKey("map", "b")).Where(Eq("ID", "1")).Delete().Execute()
 		assert.Nil(t, err)
 
 		doc := &Document{}
@@ -112,9 +110,7 @@ func TestIntegrationModifiers(t *testing.T) {
 	})
 
 	t.Run("DeleteListIndex", func(t *testing.T) {
-		err := tbl.Where(Eq("ID", "1")).Delete(
-			ListIndex("list", 1),
-		).Execute()
+		err := tbl.Fields(ListIndex("list", 1)).Where(Eq("ID", "1")).Delete().Execute()
 		assert.Nil(t, err)
 
 		doc := &Document{}

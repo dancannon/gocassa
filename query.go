@@ -85,7 +85,7 @@ func (q Query) Where(relations ...Relation) Query {
 	return q
 }
 
-func (q Query) Select(selections ...Selection) Query {
+func (q Query) Fields(selections ...Selection) Query {
 	q.selections = append(q.selections, selections...)
 	return q
 }

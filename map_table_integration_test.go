@@ -44,6 +44,23 @@ func TestIntegrationMapTable(t *testing.T) {
 		}).Execute())
 	})
 
+	t.Run("UpdateMulti", func(t *testing.T) {
+		err := MultiQuery(
+			tbl.Update("i", map[string]interface{}{
+				"fieldb": "j",
+				"fieldc": "k",
+				"fieldd": "l",
+			}),
+			tbl.Update("m", map[string]interface{}{
+				"fieldb": "n",
+				"fieldc": "o",
+				"fieldd": "p",
+			}),
+		).Execute()
+
+		assert.Nil(t, err)
+	})
+
 	t.Run("Read", func(t *testing.T) {
 		doc := &Document{}
 		err := tbl.Read("a").ScanOne(doc)
@@ -57,12 +74,14 @@ func TestIntegrationMapTable(t *testing.T) {
 
 	t.Run("List", func(t *testing.T) {
 		docs := []Document{}
-		err := tbl.List().Scan(&docs)
+		err := tbl.OrderBy(Ordering{"ID", ASC}).List().Scan(&docs)
 
 		assert.Nil(t, err)
-		if assert.Len(t, docs, 2) {
+		if assert.Len(t, docs, 4) {
 			assert.Equal(t, "a", docs[0].FieldA)
 			assert.Equal(t, "e", docs[1].FieldA)
+			assert.Equal(t, "i", docs[2].FieldA)
+			assert.Equal(t, "m", docs[3].FieldA)
 		}
 	})
 

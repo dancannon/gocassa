@@ -172,9 +172,30 @@ func (t *Table) Insert(m map[string]interface{}) RunnableQuery {
 	}
 }
 
+func (t *Table) Fields(selections ...Selection) *FilteredTable {
+	return &FilteredTable{
+		Table:      t,
+		selections: selections,
+	}
+}
+
 func (t *Table) Where(relations ...Relation) *FilteredTable {
 	return &FilteredTable{
 		Table:     t,
 		relations: relations,
+	}
+}
+
+func (t *Table) OrderBy(orderings ...Ordering) *FilteredTable {
+	return &FilteredTable{
+		Table:     t,
+		orderings: orderings,
+	}
+}
+
+func (t *Table) Limit(limit int) *FilteredTable {
+	return &FilteredTable{
+		Table: t,
+		limit: limit,
 	}
 }

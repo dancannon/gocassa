@@ -32,9 +32,9 @@ func TestMain(m *testing.M) {
 	defer qe.Close()
 
 	keyspace = NewKeyspace(qe, KEYSPACE_NAME, nil)
-	if err := keyspace.Drop(); err != nil {
-		panic(err)
-	}
+	// if err := keyspace.Drop(); err != nil {
+	// 	panic(err)
+	// }
 	if err := keyspace.Create(); err != nil {
 		panic(err)
 	}

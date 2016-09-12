@@ -13,7 +13,7 @@ func TestQuerySelect_order(t *testing.T) {
 
 	k := NewKeyspace(qe, "test", nil)
 	tbl := NewTable(k, "test", Document{}, []string{"fielda"}, nil, nil)
-	q := NewQuery(tbl, SelectQueryType).Select().OrderBy(
+	q := NewQuery(tbl, SelectQueryType).OrderBy(
 		Ordering{"fielda", DESC},
 	)
 
@@ -28,7 +28,7 @@ func TestQuerySelect_limit(t *testing.T) {
 
 	k := NewKeyspace(qe, "test", nil)
 	tbl := NewTable(k, "test", Document{}, []string{"fielda"}, nil, nil)
-	q := NewQuery(tbl, SelectQueryType).Select().Limit(10)
+	q := NewQuery(tbl, SelectQueryType).Limit(10)
 
 	stmt, values := q.GenerateStatement()
 
@@ -41,7 +41,7 @@ func TestQuerySelect_allowFiltering(t *testing.T) {
 
 	k := NewKeyspace(qe, "test", nil)
 	tbl := NewTable(k, "test", Document{}, []string{"fielda"}, nil, nil)
-	q := NewQuery(tbl, SelectQueryType).Select()
+	q := NewQuery(tbl, SelectQueryType)
 
 	stmt, values := q.WithOptions(QueryOptions{
 		AllowFiltering: true,
