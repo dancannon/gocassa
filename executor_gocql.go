@@ -31,8 +31,8 @@ type gocqlExecutor struct {
 	session *gocql.Session
 }
 
-func (qe gocqlExecutor) QueryOne(query QueryGenerator, options QueryOptions) (map[string]interface{}, error) {
-	cqlQuery := qe.createCQLQuery(query, options)
+func (qe gocqlExecutor) QueryOne(query QueryGenerator) (map[string]interface{}, error) {
+	cqlQuery := qe.createCQLQuery(query)
 
 	m := map[string]interface{}{}
 	if err := cqlQuery.MapScan(m); err != nil {
@@ -42,8 +42,8 @@ func (qe gocqlExecutor) QueryOne(query QueryGenerator, options QueryOptions) (ma
 	return m, nil
 }
 
-func (qe gocqlExecutor) QueryCAS(query QueryGenerator, options QueryOptions) (result map[string]interface{}, applied bool, err error) {
-	cqlQuery := qe.createCQLQuery(query, options)
+func (qe gocqlExecutor) QueryCAS(query QueryGenerator) (result map[string]interface{}, applied bool, err error) {
+	cqlQuery := qe.createCQLQuery(query)
 
 	m := map[string]interface{}{}
 	applied, err = cqlQuery.MapScanCAS(m)
@@ -54,8 +54,8 @@ func (qe gocqlExecutor) QueryCAS(query QueryGenerator, options QueryOptions) (re
 	return m, applied, nil
 }
 
-func (qe gocqlExecutor) Query(query QueryGenerator, options QueryOptions) ([]map[string]interface{}, error) {
-	cqlQuery := qe.createCQLQuery(query, options)
+func (qe gocqlExecutor) Query(query QueryGenerator) ([]map[string]interface{}, error) {
+	cqlQuery := qe.createCQLQuery(query)
 
 	iter := cqlQuery.Iter()
 	ret := []map[string]interface{}{}
@@ -70,8 +70,8 @@ func (qe gocqlExecutor) Query(query QueryGenerator, options QueryOptions) ([]map
 	return ret, iter.Close()
 }
 
-func (qe gocqlExecutor) Iter(query QueryGenerator, options QueryOptions) Iter {
-	cqlQuery := qe.createCQLQuery(query, options)
+func (qe gocqlExecutor) Iter(query QueryGenerator) Iter {
+	cqlQuery := qe.createCQLQuery(query)
 
 	return gocqlIter{
 		iter: cqlQuery.Iter(),
@@ -79,8 +79,8 @@ func (qe gocqlExecutor) Iter(query QueryGenerator, options QueryOptions) Iter {
 }
 
 // Query executes a query and returns the results.
-func (qe gocqlExecutor) Execute(query QueryGenerator, options QueryOptions) error {
-	cqlQuery := qe.createCQLQuery(query, options)
+func (qe gocqlExecutor) Execute(query QueryGenerator) error {
+	cqlQuery := qe.createCQLQuery(query)
 
 	return cqlQuery.Exec()
 }
@@ -110,16 +110,16 @@ func (qe gocqlExecutor) Close() {
 	qe.session.Close()
 }
 
-func (qe *gocqlExecutor) createCQLQuery(query QueryGenerator, options QueryOptions) *gocql.Query {
-	stmt, vals := query.GenerateStatement(options)
+func (qe *gocqlExecutor) createCQLQuery(query QueryGenerator) *gocql.Query {
+	stmt, vals := query.GenerateStatement()
 
 	logrus.WithFields(logrus.Fields{
 		"values": vals,
 	}).Infof("Executing query: %s", stmt)
 
 	cqlQuery := qe.session.Query(stmt, vals...)
-	if options.Consistency != nil {
-		cqlQuery = cqlQuery.Consistency(*options.Consistency)
+	if query.Options().Consistency != nil {
+		cqlQuery = cqlQuery.Consistency(*query.Options().Consistency)
 	}
 
 	return cqlQuery
@@ -135,7 +135,7 @@ func (qe *gocqlExecutor) createCQLBatch(queries []QueryGenerator, options QueryO
 	}
 
 	for _, query := range queries {
-		stmt, vals := query.GenerateStatement(options)
+		stmt, vals := query.GenerateStatement()
 
 		logrus.WithFields(logrus.Fields{
 			"values": vals,

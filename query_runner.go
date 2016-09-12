@@ -10,19 +10,18 @@ import (
 
 type RunnableQuery struct {
 	Executor QueryExecutor
-	Query    Query
-	Options  QueryOptions
+	Query    QueryGenerator
 }
 
 func (q RunnableQuery) WithOptions(options QueryOptions) RunnableQuery {
-	q.Options = options
+	q.Query = q.Query.WithOptions(options)
 	return q
 }
 
 // MapScan executes the query, copies the columns of the first selected
 // row into the map pointed at by dest and discards the rest.
 func (q RunnableQuery) ScanOne(dest interface{}) error {
-	v, err := q.Executor.QueryOne(q.Query, q.Options)
+	v, err := q.Executor.QueryOne(q.Query)
 	if err != nil {
 		return err
 	}
@@ -35,7 +34,7 @@ func (q RunnableQuery) ScanOne(dest interface{}) error {
 // the existing values did not match, the previous values will be stored
 // in dest.
 func (q RunnableQuery) ScanCAS(dest interface{}) (applied bool, err error) {
-	v, applied, err := q.Executor.QueryCAS(q.Query, q.Options)
+	v, applied, err := q.Executor.QueryCAS(q.Query)
 	if err != nil {
 		return applied, err
 	}
@@ -49,7 +48,7 @@ func (q RunnableQuery) ScanCAS(dest interface{}) (applied bool, err error) {
 // MapScan executes the query, copies the columns of the each row into the slice
 // of maps pointed at by m and discards the rest.
 func (q RunnableQuery) Scan(dest interface{}) error {
-	v, err := q.Executor.Query(q.Query, q.Options)
+	v, err := q.Executor.Query(q.Query)
 	if err != nil {
 		return err
 	}
@@ -61,11 +60,11 @@ func (q RunnableQuery) Scan(dest interface{}) error {
 // pages are fetched, it is not the value of the total number of rows this iter
 // will return unless there is only a single page returned.
 func (q RunnableQuery) Iter() Iter {
-	return q.Executor.Iter(q.Query, q.Options)
+	return q.Executor.Iter(q.Query)
 }
 
 func (q RunnableQuery) Execute() error {
-	return q.Executor.Execute(q.Query, q.Options)
+	return q.Executor.Execute(q.Query)
 }
 
 type Iter interface {

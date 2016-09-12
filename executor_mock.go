@@ -34,26 +34,26 @@ type mockExecutor struct {
 	mock mock.Mock
 }
 
-func (qe mockExecutor) QueryOne(query QueryGenerator, options QueryOptions) (map[string]interface{}, error) {
-	ret := qe.mock.Called(query.GenerateStatement(options))
+func (qe mockExecutor) QueryOne(query QueryGenerator) (map[string]interface{}, error) {
+	ret := qe.mock.Called(query.GenerateStatement())
 
 	return ret.Get(0).(map[string]interface{}), ret.Error(1)
 }
 
-func (qe mockExecutor) QueryCAS(query QueryGenerator, options QueryOptions) (result map[string]interface{}, applied bool, err error) {
-	ret := qe.mock.Called(query.GenerateStatement(options))
+func (qe mockExecutor) QueryCAS(query QueryGenerator) (result map[string]interface{}, applied bool, err error) {
+	ret := qe.mock.Called(query.GenerateStatement())
 
 	return ret.Get(0).(map[string]interface{}), ret.Bool(1), ret.Error(2)
 }
 
-func (qe mockExecutor) Query(query QueryGenerator, options QueryOptions) ([]map[string]interface{}, error) {
-	ret := qe.mock.Called(query.GenerateStatement(options))
+func (qe mockExecutor) Query(query QueryGenerator) ([]map[string]interface{}, error) {
+	ret := qe.mock.Called(query.GenerateStatement())
 
 	return ret.Get(0).([]map[string]interface{}), ret.Error(1)
 }
 
-func (qe mockExecutor) Iter(query QueryGenerator, options QueryOptions) Iter {
-	ret := qe.mock.Called(query.GenerateStatement(options))
+func (qe mockExecutor) Iter(query QueryGenerator) Iter {
+	ret := qe.mock.Called(query.GenerateStatement())
 
 	return mockIter{
 		rows: ret.Get(0).([]map[string]interface{}),
@@ -61,8 +61,8 @@ func (qe mockExecutor) Iter(query QueryGenerator, options QueryOptions) Iter {
 	}
 }
 
-func (qe mockExecutor) Execute(query QueryGenerator, options QueryOptions) error {
-	ret := qe.mock.Called(query.GenerateStatement(options))
+func (qe mockExecutor) Execute(query QueryGenerator) error {
+	ret := qe.mock.Called(query.GenerateStatement())
 
 	return ret.Error(0)
 }
@@ -71,7 +71,7 @@ func (qe mockExecutor) ExecuteBatch(queries []QueryGenerator, options QueryOptio
 	stmts := []string{}
 	values := [][]interface{}{}
 	for _, query := range queries {
-		stmt, vals := query.GenerateStatement(options)
+		stmt, vals := query.GenerateStatement()
 		stmts = append(stmts, stmt)
 		values = append(values, vals)
 	}
@@ -85,7 +85,7 @@ func (qe mockExecutor) ExecuteBatchCAS(queries []QueryGenerator, options QueryOp
 	stmts := []string{}
 	values := [][]interface{}{}
 	for _, query := range queries {
-		stmt, vals := query.GenerateStatement(options)
+		stmt, vals := query.GenerateStatement()
 		stmts = append(stmts, stmt)
 		values = append(values, vals)
 	}

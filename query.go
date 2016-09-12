@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/dancannon/gocassa/encoding"
-	"github.com/davecgh/go-spew/spew"
 )
 
 // TODO: Add IF conditions to DELETE/UPDATE
@@ -22,16 +21,35 @@ const (
 )
 
 type QueryGenerator interface {
-	GenerateStatement(options QueryOptions) (stmt string, values []interface{})
+	GenerateStatement() (stmt string, values []interface{})
+	WithOptions(options QueryOptions) QueryGenerator
+	Options() QueryOptions
 }
 
 type RawQuery struct {
-	Statement string
-	Values    []interface{}
+	statement string
+	values    []interface{}
+	options   QueryOptions
 }
 
-func (q RawQuery) GenerateStatement(options QueryOptions) (stmt string, values []interface{}) {
-	return q.Statement, q.Values
+func NewRawQuery(stmt string, values []interface{}) RawQuery {
+	return RawQuery{
+		statement: stmt,
+		values:    values,
+	}
+}
+
+func (q RawQuery) GenerateStatement() (stmt string, values []interface{}) {
+	return q.statement, q.values
+}
+
+func (q RawQuery) WithOptions(options QueryOptions) QueryGenerator {
+	q.options = options
+	return q
+}
+
+func (q RawQuery) Options() QueryOptions {
+	return q.options
 }
 
 type Query struct {
@@ -42,6 +60,7 @@ type Query struct {
 	orderings  []Ordering
 	limit      int
 	values     map[string]interface{}
+	options    QueryOptions
 }
 
 func NewQuery(table *Table, queryType QueryType) Query {
@@ -49,6 +68,15 @@ func NewQuery(table *Table, queryType QueryType) Query {
 		table:     table,
 		queryType: queryType,
 	}
+}
+
+func (q Query) WithOptions(options QueryOptions) QueryGenerator {
+	q.options = options
+	return q
+}
+
+func (q Query) Options() QueryOptions {
+	return q.options
 }
 
 func (q Query) Where(relations ...Relation) Query {
@@ -77,22 +105,22 @@ func (q Query) Values(m map[string]interface{}) Query {
 	return q
 }
 
-func (q Query) GenerateStatement(options QueryOptions) (stmt string, values []interface{}) {
+func (q Query) GenerateStatement() (stmt string, values []interface{}) {
 	switch q.queryType {
 	case SelectQueryType:
-		return q.generateSelectStatement(options)
+		return q.generateSelectStatement()
 	case InsertQueryType:
-		return q.generateInsertStatement(options)
+		return q.generateInsertStatement()
 	case UpdateQueryType:
-		return q.generateUpdateStatement(options)
+		return q.generateUpdateStatement()
 	case DeleteQueryType:
-		return q.generateDeleteStatement(options)
+		return q.generateDeleteStatement()
 	default:
 		return "", nil
 	}
 }
 
-func (q Query) generateSelectStatement(options QueryOptions) (string, []interface{}) {
+func (q Query) generateSelectStatement() (string, []interface{}) {
 
 	buf := new(bytes.Buffer)
 	values := []interface{}{}
@@ -108,16 +136,16 @@ func (q Query) generateSelectStatement(options QueryOptions) (string, []interfac
 	buf.WriteString(".")
 	buf.WriteString(q.table.Name())
 	values = append(values, q.addWhereToStatement(buf)...)
-	values = append(values, q.addOrderByToStatement(buf, options)...)
-	values = append(values, q.addLimitToStatement(buf, options)...)
-	if options.AllowFiltering {
+	values = append(values, q.addOrderByToStatement(buf)...)
+	values = append(values, q.addLimitToStatement(buf)...)
+	if q.options.AllowFiltering {
 		buf.WriteString(" ALLOW FILTERING")
 	}
 
 	return buf.String(), values
 }
 
-func (q Query) generateInsertStatement(options QueryOptions) (string, []interface{}) {
+func (q Query) generateInsertStatement() (string, []interface{}) {
 	buf := new(bytes.Buffer)
 	values := []interface{}{}
 
@@ -130,12 +158,12 @@ func (q Query) generateInsertStatement(options QueryOptions) (string, []interfac
 	buf.WriteString(") VALUES (")
 	values = append(values, q.addValuesToStatement(buf)...)
 	buf.WriteString(")")
-	values = append(values, q.addOptionsToStatement(buf, options)...)
+	values = append(values, q.addOptionsToStatement(buf)...)
 
 	return buf.String(), values
 }
 
-func (q Query) generateUpdateStatement(options QueryOptions) (string, []interface{}) {
+func (q Query) generateUpdateStatement() (string, []interface{}) {
 	buf := new(bytes.Buffer)
 	values := []interface{}{}
 
@@ -146,12 +174,12 @@ func (q Query) generateUpdateStatement(options QueryOptions) (string, []interfac
 	buf.WriteString(" SET ")
 	values = append(values, q.addAssignmentsToStatement(buf)...)
 	values = append(values, q.addWhereToStatement(buf)...)
-	values = append(values, q.addOptionsToStatement(buf, options)...)
+	values = append(values, q.addOptionsToStatement(buf)...)
 
 	return buf.String(), values
 }
 
-func (q Query) generateDeleteStatement(options QueryOptions) (string, []interface{}) {
+func (q Query) generateDeleteStatement() (string, []interface{}) {
 	buf := new(bytes.Buffer)
 	values := []interface{}{}
 
@@ -258,11 +286,11 @@ func (q Query) addWhereToStatement(buf *bytes.Buffer) []interface{} {
 	return values
 }
 
-func (q Query) addOrderByToStatement(buf *bytes.Buffer, options QueryOptions) []interface{} {
+func (q Query) addOrderByToStatement(buf *bytes.Buffer) []interface{} {
 	values := []interface{}{}
 
-	if len(options.Orderings) > 0 {
-		q.orderings = options.Orderings
+	if len(q.options.Orderings) > 0 {
+		q.orderings = q.options.Orderings
 	}
 
 	if len(q.orderings) > 0 {
@@ -281,11 +309,9 @@ func (q Query) addOrderByToStatement(buf *bytes.Buffer, options QueryOptions) []
 	return values
 }
 
-func (q Query) addOptionsToStatement(buf *bytes.Buffer, options QueryOptions) []interface{} {
-	timestamp := options.Timestamp.UnixNano() / 1000000
-	ttl := int64(options.TTL.Seconds())
-
-	spew.Dump(options.TTL)
+func (q Query) addOptionsToStatement(buf *bytes.Buffer) []interface{} {
+	timestamp := q.options.Timestamp.UnixNano() / 1000000
+	ttl := int64(q.options.TTL.Seconds())
 
 	if timestamp > 0 && ttl > 0 {
 		buf.WriteString(" USING TIMESTAMP ")
@@ -303,9 +329,9 @@ func (q Query) addOptionsToStatement(buf *bytes.Buffer, options QueryOptions) []
 	return nil
 }
 
-func (q Query) addLimitToStatement(buf *bytes.Buffer, options QueryOptions) []interface{} {
-	if options.Limit > 0 {
-		q.limit = options.Limit
+func (q Query) addLimitToStatement(buf *bytes.Buffer) []interface{} {
+	if q.options.Limit > 0 {
+		q.limit = q.options.Limit
 	}
 
 	if q.limit > 0 {

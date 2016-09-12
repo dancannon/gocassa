@@ -118,9 +118,7 @@ func (t *Table) CreateStatement() string {
 
 // Create attempts to create the current table if it does not already exist.
 func (t *Table) Create() error {
-	return t.keyspace.QueryExecutor().Execute(RawQuery{
-		Statement: t.CreateStatement(),
-	}, QueryOptions{})
+	return t.keyspace.QueryExecutor().Execute(NewRawQuery(t.CreateStatement(), nil))
 }
 
 // DropStatement returns a CQL which will delete the current table if it
@@ -131,9 +129,7 @@ func (t *Table) DropStatement() string {
 
 // Drop attempts to delete the current table if it exists
 func (t *Table) Drop() error {
-	return t.keyspace.QueryExecutor().Execute(RawQuery{
-		Statement: t.DropStatement(),
-	}, QueryOptions{})
+	return t.keyspace.QueryExecutor().Execute(NewRawQuery(t.DropStatement(), nil))
 }
 
 func (t *Table) Set(v interface{}) RunnableQuery {

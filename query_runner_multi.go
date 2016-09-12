@@ -33,7 +33,7 @@ func (qs RunnableQueries) Execute() error {
 			executor = q.Executor
 		}
 
-		if err := executor.Execute(q.Query, q.Options); err != nil {
+		if err := executor.Execute(q.Query); err != nil {
 			return err
 		}
 	}

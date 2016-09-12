@@ -59,9 +59,7 @@ func (k *Keyspace) CreateStatement() string {
 
 // Create attempts to create the current keyspace if it does not already exist.
 func (k *Keyspace) Create() error {
-	return k.qe.Execute(RawQuery{
-		Statement: k.CreateStatement(),
-	}, QueryOptions{})
+	return k.qe.Execute(NewRawQuery(k.CreateStatement(), nil))
 }
 
 // DropStatement returns a CQL which will delete the current keyspace if it
@@ -72,9 +70,7 @@ func (k *Keyspace) DropStatement() string {
 
 // Drop attempts to delete the current keyspace if it exists
 func (k *Keyspace) Drop() error {
-	return k.qe.Execute(RawQuery{
-		Statement: k.DropStatement(),
-	}, QueryOptions{})
+	return k.qe.Execute(NewRawQuery(k.DropStatement(), nil))
 }
 
 // Returns table names in a keyspace
@@ -84,9 +80,7 @@ func (k *Keyspace) Tables() ([]string, error) {
 		k.Name(),
 	)
 
-	maps, err := k.qe.Query(RawQuery{
-		Statement: stmt,
-	}, QueryOptions{})
+	maps, err := k.qe.Query(NewRawQuery(stmt, nil))
 	if err != nil {
 		return nil, err
 	}

@@ -5,22 +5,22 @@ package gocassa
 type QueryExecutor interface {
 	// QueryOne executes the query and returns the first selected row as a map
 	// and discards the rest
-	QueryOne(query QueryGenerator, options QueryOptions) (map[string]interface{}, error)
+	QueryOne(query QueryGenerator) (map[string]interface{}, error)
 
 	// QueryCAS executes a lightweight transaction (i.e. an UPDATE or INSERT
 	// statement containing an IF clause). If the transaction fails because
 	// the existing values did not match, the previous values will be returned
-	QueryCAS(query QueryGenerator, options QueryOptions) (result map[string]interface{}, applied bool, err error)
+	QueryCAS(query QueryGenerator) (result map[string]interface{}, applied bool, err error)
 
 	// Query executes the query, returns a slice of maps containing each row.
-	Query(query QueryGenerator, options QueryOptions) ([]map[string]interface{}, error)
+	Query(query QueryGenerator) ([]map[string]interface{}, error)
 
 	// Iter executes the query and returns an iterator capable of iterating over
 	// all results.
-	Iter(query QueryGenerator, options QueryOptions) Iter
+	Iter(query QueryGenerator) Iter
 
 	// Execute executes a query and discards any results
-	Execute(query QueryGenerator, options QueryOptions) error
+	Execute(query QueryGenerator) error
 
 	// ExecuteBatch executes a batch operation and returns nil if successful
 	// otherwise an error is returned describing the failure.
