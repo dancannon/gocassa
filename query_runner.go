@@ -11,10 +11,32 @@ import (
 type RunnableQuery struct {
 	Executor QueryExecutor
 	Query    QueryGenerator
+
+	deferResult bool
+	deferOne    bool
+	dest        interface{}
 }
 
 func (q RunnableQuery) WithOptions(options QueryOptions) RunnableQuery {
 	q.Query = q.Query.WithOptions(options)
+	return q
+}
+
+// TODO: Is defer the right name here?
+func (q RunnableQuery) DeferScanOne(dest interface{}) RunnableQuery {
+	q.deferResult = true
+	q.deferOne = true
+	q.dest = dest
+
+	return q
+}
+
+// TODO: Is defer the right name here?
+func (q RunnableQuery) DeferScan(dest interface{}) RunnableQuery {
+	q.deferResult = true
+	q.deferOne = false
+	q.dest = dest
+
 	return q
 }
 
@@ -64,6 +86,14 @@ func (q RunnableQuery) Iter() Iter {
 }
 
 func (q RunnableQuery) Execute() error {
+	if q.deferResult {
+		if q.deferOne {
+			return q.ScanOne(q.dest)
+		} else {
+			return q.Scan(q.dest)
+		}
+	}
+
 	return q.Executor.Execute(q.Query)
 }
 

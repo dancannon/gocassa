@@ -173,6 +173,31 @@ func TestIntegrationMultiQuery(t *testing.T) {
 		assert.Nil(t, iter.Close())
 		assert.Equal(t, 2, iter.NumRows())
 	})
+	t.Run("ExecuteReadOne", func(t *testing.T) {
+		docs := [2]Document{}
+
+		q := MultiQuery()
+		q = q.Add(tbl.Where(Eq("id", "1")).Read().DeferScanOne(&docs[0]))
+		q = q.Add(tbl.Where(Eq("id", "2")).Read().DeferScanOne(&docs[1]))
+		err := q.Execute()
+		assert.Nil(t, err)
+
+		assert.Equal(t, "1", docs[0].ID)
+		assert.Equal(t, "2", docs[1].ID)
+	})
+	t.Run("ExecuteRead", func(t *testing.T) {
+		docs1 := []Document{}
+		docs2 := []Document{}
+
+		q := MultiQuery()
+		q = q.Add(tbl.Where(Eq("id", "1")).Read().DeferScan(&docs1))
+		q = q.Add(tbl.Where(Eq("id", "2")).Read().DeferScan(&docs2))
+		err := q.Execute()
+		assert.Nil(t, err)
+
+		assert.Equal(t, "1", docs1[0].ID)
+		assert.Equal(t, "2", docs2[0].ID)
+	})
 	t.Run("Batch", func(t *testing.T) {
 		q := MultiQuery()
 		q = q.Add(tbl.Set(Document{
